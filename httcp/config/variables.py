@@ -21,7 +21,7 @@ def keep_columns(cfg: od.Config) -> None:
             "GenZ.*",
             # general event info
             "run", "luminosityBlock", "event",
-            "PV.npvs","Pileup.nTrueInt","Pileup.nPU","genWeight", "LHEWeight.originalXWGTUP", "HTXS_njets*", "LHE_Njets","weight","zpt_weight","muon_weight_nom","mc_weight","tau_weight_nom",
+            "PV.npvs","Pileup.nTrueInt","Pileup.nPU","genWeight", "LHEWeight.originalXWGTUP", "HTXS_njets*", "LHE_Njets","weight","muon_weight_nom","mc_weight","tau_weight_nom", #zpt_weight
         } | {
             f"PuppiMET.{var}" for var in [
                 "pt", "phi", "significance",

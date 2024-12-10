@@ -48,15 +48,16 @@ def create_cutflow_histogram(cuts, data, xlabel="Selections", ylabel="Selection 
             y = n_evt
         print(f'Event numbers:')
 
-        #ax.step(x, y , color=color[i], where='mid',marker='o', linewidth=1.2, alpha=0.8, label=r"Z $\rightarrow \ell \ell$")
-        #ax.step(x, y , color=color[i], where='mid',marker='o', linewidth=1.2, alpha=0.8, label=r"W $\rightarrow \ell \nu$")
-        #ax.step(x, y , color=color[i], where='mid',marker='o', linewidth=1.2, alpha=0.8, label=r"EGamma_2022C Data")
+        # ax.step(x, y , color=color[i], where='mid',marker='o', linewidth=1.2, alpha=0.8, label=r"Z $\rightarrow \ell \ell$")
+        # ax.step(x, y , color=color[i], where='mid',marker='o', linewidth=1.2, alpha=0.8, label=r"W $\rightarrow \ell \nu$")
+        # ax.step(x, y , color=color[i], where='mid',marker='o', linewidth=1.2, alpha=0.8, label=r"EGamma_2022C Data")
         # ax.step(x, y , color=color[i], where='mid',marker='o', linewidth=1.2, alpha=0.8, label=r"EGamma_2022D Data")
         # ax.step(x, y , color=color[i], where='mid',marker='o', linewidth=1.2, alpha=0.8, label=r"Muon_2022C Data")
         # ax.step(x, y , color=color[i], where='mid',marker='o', linewidth=1.2, alpha=0.8, label=r"Muon_2022D Data")
-        ax.step(x, y , color=color[i], where='mid',marker='o', linewidth=1.2, alpha=0.8, label=r"Tau_2022C Data")
+        # ax.step(x, y , color=color[i], where='mid',marker='o', linewidth=1.2, alpha=0.8, label=r"Tau_2022C Data")
         # ax.step(x, y , color=color[i], where='mid',marker='o', linewidth=1.2, alpha=0.8, label=r"Tau_2022D Data")
-        #ax.step(x, y , color=color[i], where='mid',marker='o', linewidth=1.2, alpha=0.8, label=r"$H_{ggf} \rightarrow \tau\tau$")        
+        # ax.step(x, y , color=color[i], where='mid',marker='o', linewidth=1.2, alpha=0.8, label=r"$H_{ggf} \rightarrow \tau\tau$")        
+        ax.step(x, y , color=color[i], where='mid',marker='o', linewidth=1.2, alpha=0.8, label=r"Single top limited")
 
         for i, txt in enumerate(y):
             the_txt = f'{txt:.4f}' if rel else f'{txt:.0f}'
@@ -146,6 +147,7 @@ def get_hist_values(pickle_file):
 # #tau_C
 path22 = '/afs/cern.ch/user/j/jmalvaso/CPinHToTauTau/data/cf_store/analysis_httcp/cf.CreateCutflowHistograms/run3_2022_preEE/data_tau_C/nominal/calib__main/sel__main__steps_trigger_met_filter_b_veto_dilepton_veto_selected_hcand_selected_hcand_trigmatch_single_hcand_extra_lepton_veto_decay_prods_are_ok/dev/cutflow_hist__event.pickle'
 
+path22 = '/afs/cern.ch/user/j/jmalvaso/CPinHToTauTau/data/cf_store/analysis_httcp/cf.CreateCutflowHistograms/run3_2022_postEE_etau_limited/st_schannel_t_lep/nominal/calib__main/sel__main__steps_trigger_met_filter_dilepton_veto_has_at_least_2_leptons_selected_hcand_selected_hcand_trigmatch_single_hcand_extra_lepton_veto_decay_prods_are_ok_nans_removed_jet_veto_map/dev/cutflow_hist__event.pickle'
 cuts, values22 = get_hist_values(path22)
 
 create_cutflow_histogram(cuts, 

@@ -87,7 +87,7 @@ case $1 in
         config="run3_2022_preEE"
         data='data_mu_C,data_mu_D,data_tau_C,data_tau_D,data_e_C,data_e_D,'
         bkg_ewk='wj_incl,ww,wz,zz,dy_incl,'
-        bkg_top='st_twchannel_t_fh,st_twchannel_t_sl,st_twchannel_t_dl,st_twchannel_tbar_sl,st_twchannel_tbar_dl,st_tchannel_tbar,st_tchannel_t,'
+        bkg_top='st_twchannel_t_fh,st_twchannel_t_sl,st_twchannel_t_dl,st_twchannel_tbar_sl,st_twchannel_tbar_dl,st_tchannel_tbar,st_tchannel_t,st_schannel_tbar,st_schannel_t'
         bkg_ttbar='tt_sl,tt_dl,tt_fh'
         datasets="$data$bkg_ewk$bkg_top$bkg_ttbar"
         processes='dy_z2tautau,dy_z2mumu,dy_z2ee,vv,tt,st,wj,data'

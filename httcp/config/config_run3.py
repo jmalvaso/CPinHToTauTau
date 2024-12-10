@@ -91,11 +91,11 @@ def add_run3(ana: od.Analysis,
         "data_e",
         "data_singlemu",
         #Drell-Yan
-        "dy_lep",
+        #"dy_lep",
         "dy_z2ee",
         "dy_z2mumu",
         "dy_z2tautau",
-        # "dy_lep_m10to50",
+        "dy_lep_NLO",
         #W + jets
         "wj",
         #diboson
@@ -142,8 +142,7 @@ def add_run3(ana: od.Analysis,
         "data_tau_C",
         "data_tau_D",
         #Drell-Yan
-        "dy_lep_madgraph",
-        # "dy_lep_m10to50",
+        #"dy_lep_madgraph",
         #W+jets
         "wj_incl_madgraph",
         #Diboson
@@ -181,8 +180,8 @@ def add_run3(ana: od.Analysis,
         "data_tau_F",
         "data_tau_G",
         #Drell-Yan
-        "dy_lep_madgraph",
-        # "dy_lep_m10to50",
+        #"dy_lep_madgraph",
+        "dy_lep_amcatnloFXFX",
         #W+jets
         "wj_incl_madgraph",
         #Diboson

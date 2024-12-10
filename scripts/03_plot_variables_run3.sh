@@ -13,7 +13,7 @@ args=(
         --cf.ReduceEvents-workflow $workflow
         --cf.MergeReducedEvents-workflow $workflow
         --variables $variables
-        --file-types pdf
+        --file-types png
 	--hist-hooks qcd_hook
         --general-settings "cms-label=pw"
         "${@:2}"
