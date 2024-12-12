@@ -25,9 +25,10 @@ def main(self: WeightProducer, events: ak.Array, **kwargs) -> ak.Array:
         weight = weight * Route(column).apply(events)
     processes = self.dataset_inst.processes.names()
     process_id = events.process_id
-    if ak.any(['dy' in proc for proc in processes]) :
+    Z_ee_weight = 1.3
+    if ak.any(['dy' in proc for proc in processes]) and self.dataset_inst.campaign.x.tag == 'postEE':
         print("Applying an ad hoc weight to Z->ee...")
-        weight = ak.where(process_id==51001,weight*1.3,weight)
+        weight = ak.where(process_id==51001,weight*Z_ee_weight,weight)
         print("The ad hoc weight to Z->ee was applied succefully...")
         
     return events, weight
