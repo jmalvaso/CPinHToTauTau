@@ -321,72 +321,69 @@ def tau_selection(
 #   https://cms.cern.ch/iCMS/analysisadmin/cadilines?id=2325&ancode=HIG-20-006&tp=an&line=HIG-20-006
 #   http://cms.cern.ch/iCMS/jsp/openfile.jsp?tp=draft&files=AN2019_192_v15.pdf
 # ------------------------------------------------------------------------------------------------------- #
-@selector(
-    uses={ f"Jet.{var}" for var in 
-        [
-            "pt", "eta", "phi", "mass",
-            "jetId", "btagDeepFlavB",
-        ]} | {optional("Jet.puId")} ,
-    exposed=False,
-)
-def jet_selection(
-        self: Selector,
-        events: ak.Array,
-        **kwargs
-) -> tuple[ak.Array, SelectionResult]:
-    """
-    This function vetoes b-jets with sufficiently high pt and incide eta region of interest
-    """
-    year = self.config_inst.campaign.x.year
-    is_run2 = (self.config_inst.campaign.x.year in [2016,2017,2018])
+# @selector(
+#     uses={ f"Jet.{var}" for var in 
+#         [
+#             "pt", "eta", "phi", "mass",
+#             "jetId", "btagDeepFlavB",
+#         ]} | {optional("Jet.puId")} ,
+#     exposed=False,
+# )
+# def jet_selection(
+#         self: Selector,
+#         events: ak.Array,
+#         **kwargs
+# ) -> tuple[ak.Array, SelectionResult]:
+#     """
+#     This function vetoes b-jets with sufficiently high pt and incide eta region of interest
+#     """
+#     year = self.config_inst.campaign.x.year
+#     is_run2 = (self.config_inst.campaign.x.year in [2016,2017,2018])
     
    
-    # nominal selection
-    good_selections = {
-        "jet_pt_30"               : events.Jet.pt > 30.0,
-        "jet_eta_2.4"             : abs(events.Jet.eta) < 2.4,
-        #"jet_id"                  : events.Jet.jetId == 0b110,  # Jet ID flag: bit2 is tight, bit3 is tightLepVeto 
-    }
+#     # nominal selection
+#     good_selections = {
+#         "jet_pt_30"               : events.Jet.pt > 30.0,
+#         "jet_eta_2.4"             : abs(events.Jet.eta) < 2.4,
+#         #"jet_id"                  : events.Jet.jetId == 0b110,  # Jet ID flag: bit2 is tight, bit3 is tightLepVeto 
+#     }
     
-    #if is_run2: 
-    #    good_selections["jet_puId"] = ((events.Jet.pt >= 50.0) | (events.Jet.puId)) #For the Run2 there was
+#     #if is_run2: 
+#     #    good_selections["jet_puId"] = ((events.Jet.pt >= 50.0) | (events.Jet.puId)) #For the Run2 there was
     
-    # b-tagged jets, tight working point
+#     # b-tagged jets, tight working point
     
-    jet_mask  = ak.local_index(events.Jet.pt) >= 0 #Create a mask filled with ones
-    selection_steps = {}
+#     jet_mask  = ak.local_index(events.Jet.pt) >= 0 #Create a mask filled with ones
+#     selection_steps = {}
 
-    selection_steps = {"Starts with": jet_mask}
-    for cut in good_selections.keys():
-        jet_mask = jet_mask & ak.fill_none(good_selections[cut], False)
-        selection_steps[cut] = jet_mask
+#     selection_steps = {"Starts with": jet_mask}
+#     for cut in good_selections.keys():
+#         jet_mask = jet_mask & ak.fill_none(good_selections[cut], False)
+#         selection_steps[cut] = jet_mask
     
-    sorted_indices = ak.argsort(events.Jet.pt, axis=-1, ascending=False)
-    good_jet_indices = sorted_indices[jet_mask[sorted_indices]]
-    good_jet_indices = ak.values_astype(good_jet_indices, np.int32)
+#     sorted_indices = ak.argsort(events.Jet.pt, axis=-1, ascending=False)
+#     good_jet_indices = sorted_indices[jet_mask[sorted_indices]]
+#     good_jet_indices = ak.values_astype(good_jet_indices, np.int32)
 
-    # b-tagged jets, tight working point
-    btag_wp = self.config_inst.x.btag_working_points[year].deepjet.medium
-    b_jet_mask = jet_mask & (events.Jet.btagDeepFlavB >= btag_wp)
-    selection_steps["btag"] = ak.fill_none(b_jet_mask, False)
+#     # b-tagged jets, tight working point
+#     btag_wp = self.config_inst.x.btag_working_points[year].deepjet.medium
+#     b_jet_mask = jet_mask & (events.Jet.btagDeepFlavB >= btag_wp)
+#     selection_steps["btag"] = ak.fill_none(b_jet_mask, False)
 
-    # bjet veto
-    bjet_veto = ak.sum(b_jet_mask, axis=1) == 0
+#     # bjet veto
+#     bjet_veto = ak.sum(b_jet_mask, axis=1) == 0
 
-    return events, SelectionResult(
-        steps = {
-            "b_veto": bjet_veto,
-        }, 
-        objects = {
-            "Jet": {
-                "Jet": good_jet_indices,
-            },
-        },
-        aux = selection_steps,
-    )
-    
-
-
+#     return events, SelectionResult(
+#         steps = {
+#             "b_veto": bjet_veto,
+#         }, 
+#         objects = {
+#             "Jet": {
+#                 "Jet": good_jet_indices,
+#             },
+#         },
+#         aux = selection_steps,
+#     )
 # ------------------------------------------------------------------------------------------------------- #
 # GenTau Selection
 # Reference:

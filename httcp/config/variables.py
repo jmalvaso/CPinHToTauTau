@@ -34,8 +34,12 @@ def keep_columns(cfg: od.Config) -> None:
             ]     
         } | {
             f"Jet.{var}" for var in [
-                "pt", "eta", "phi", "mass", 
-                "btagDeepFlavB", "hadronFlavour", "pt_no_jec", "phi_no_jec","eta_no_jec", "mass_no_jec", "jec_no_jec_diff","number_of_jets",
+                "pt", "eta", "phi", "mass", "jetId", 
+                "btagDeepFlavB", "hadronFlavour", 
+                "pt_no_jec", "phi_no_jec","eta_no_jec", 
+                "mass_no_jec", "jec_no_jec_diff","number_of_jets",
+                "n_jets", "leading_jet_pt","subleading_jet_pt",
+                "delta_eta_jj","mjj","n_jets_tag",
             ] 
         } | {
             f"Tau.{var}" for var in [
@@ -257,6 +261,51 @@ def add_jet_features(cfg: od.Config) -> None:
             binning=(32, -3.2, 3.2),
             x_title=r"Jet $\phi$ no jec",
         )
+        
+    cfg.add_variable(
+        name="N_jets_pT_30_eta_4_7_Tight",
+        expression="Jet.n_jets",
+        binning=(11, -0.5, 10.5),
+        discrete_x=True,
+        x_title="N_jets_pT_30_eta_4_7_Tight",
+    )
+    
+    cfg.add_variable(
+        name="N_jets_pT_20_eta_2_5_Tight",
+        expression="Jet.n_jets_tag",
+        binning=(11, -0.5, 10.5),
+        discrete_x=True,
+        x_title="N_jets_pT_20_eta_2_5_Tight",
+    )
+    
+    cfg.add_variable(
+        name="Leading_jet_pt",
+        expression="Jet.leading_jet_pt",
+        binning=(30, 0.0, 300.0),
+        unit="GeV",
+        x_title=r"$Leading jet p_{T}$",
+    )        
+    cfg.add_variable(
+        name="Subleading_jet_pt",
+        expression="Jet.subleading_jet_pt",
+        binning=(25, 0.0, 250.0),
+        unit="GeV",
+        x_title=r"$Subleading jet p_{T}$",
+    )
+    cfg.add_variable(
+        name="delta_eta_jj",
+        expression="Jet.delta_eta_jj",
+        null_value=EMPTY_FLOAT,
+        binning=(20,-10,10),
+        x_title=r"$\Delta\eta_{jj}",
+    ) 
+    cfg.add_variable(
+        name="mjj",
+        expression="Jet.mjj",
+        binning=(40, 10.0, 410.0),
+        unit="GeV",
+        x_title=r"$m_{jj}$",
+    )      
     cfg.add_variable(
         name="jet_jec_no_jec_diff",
         expression="Jet.jec_no_jec_diff",
@@ -279,6 +328,8 @@ def add_jet_features(cfg: od.Config) -> None:
         binning=(30, 0,1),
         x_title=r"raw DeepJetFlawB",
     )
+    
+    
 
 
 def add_highlevel_features(cfg: od.Config) -> None:    

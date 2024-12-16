@@ -388,4 +388,22 @@ def hlt_path_matching(self: Producer, events: ak.Array, triggers: ak.Array, pair
     return events, matched_masks
 
 
+def find_fields_with_nan(awk_array):
+    """
+    Identifies fields in an Awkward Array that contain NaN values.
 
+    Parameters:
+        awk_array (ak.Array): Input Awkward Array.
+
+    Returns:
+        list: A list of field names that have NaN values.
+    """
+    fields_with_nan = []
+    
+    for field in awk_array.fields:
+        field_data = awk_array[field]
+        
+        if ak.any(np.isnan(field_data)):
+            fields_with_nan.append(field)
+    
+    return fields_with_nan

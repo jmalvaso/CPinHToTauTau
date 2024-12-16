@@ -23,7 +23,7 @@ from columnflow.util import maybe_import, DotDict
 from columnflow.columnar_util import optional_column as optional
 from columnflow.columnar_util import EMPTY_FLOAT, Route, set_ak_column
 
-from httcp.selection.physics_objects import jet_selection, muon_selection, electron_selection, tau_selection, gentau_selection
+from httcp.selection.physics_objects import muon_selection, electron_selection, tau_selection, gentau_selection
 from httcp.selection.trigger import trigger_selection
 from httcp.selection.lepton_pair import pair_selection
 from httcp.selection.match_trigobj import match_trigobj
@@ -53,7 +53,6 @@ coffea = maybe_import("coffea")
         muon_selection,
         electron_selection,
         tau_selection,
-        jet_selection,
         jet_veto,
         pair_selection,
         channel_id,
@@ -78,7 +77,6 @@ coffea = maybe_import("coffea")
         muon_selection,
         electron_selection,
         tau_selection,
-        jet_selection,
         jet_veto,
         pair_selection,
         channel_id,
