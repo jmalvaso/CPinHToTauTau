@@ -8,8 +8,9 @@ categories_mutau="mutau_signal_reg"
 variables_mutau='mutau_lep0_pt,mutau_lep0_eta,mutau_lep0_phi,mutau_lep0_ip_sig,mutau_lep1_pt,mutau_lep1_eta,mutau_lep1_phi,mutau_lep1_mass,mutau_lep1_decayModePNet,mutau_lep1_decayMode,mutau_mt,mutau_mvis,mutau_delta_r,mutau_pt,puppi_met_pt,puppi_met_phi'
 
 categories_etau="etau_signal_reg_no_mt,etau_signal_reg"
-variables_etau='mjj'
-# 'etau_mt,jet_1_pt,etau_lep0_pt,etau_lep0_eta,etau_lep0_phi,etau_lep0_ip_sig,etau_lep1_pt,etau_lep1_eta,etau_lep1_phi,etau_lep1_mass,etau_lep1_decayModePNet,etau_lep1_decayMode,etau_mt,etau_mvis,etau_delta_r,etau_pt,puppi_met_pt,puppi_met_phi'
+variables_etau= 'etau_mt,jet_1_pt,etau_lep0_pt,etau_lep0_eta,etau_lep0_phi,etau_lep0_ip_sig,etau_lep1_pt,etau_lep1_eta,etau_lep1_phi,etau_lep1_mass,etau_lep1_decayModePNet,etau_lep1_decayMode,etau_mt,etau_mvis,etau_delta_r,etau_pt,puppi_met_pt,puppi_met_phi'
+
+#'mjj,N_jets_pT_30_eta_4_7_Tight,N_jets_pT_20_eta_2_5_Tight,Leading_jet_pt,Subleading_jet_pt,delta_eta_jj'
 
 data_e_2022preEE='data_e_C,data_e_D,'
 data_mu_2022preEE='data_singlemu_C,data_mu_C,data_mu_D,'

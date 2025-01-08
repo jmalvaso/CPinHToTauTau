@@ -148,9 +148,9 @@ def jet_pt_def(
     max_len                   = ak.max([lep0_max_obj,lep1_max_obj])
     
     jet_vs_lep0_pt            = ak.pad_none(jet_vs_lep0.pt, max_len)
-    jet_vs_lep0_pt            = ak.fill_none(jet_vs_lep0_pt, -1)
+    jet_vs_lep0_pt            = ak.fill_none(jet_vs_lep0_pt, -999)
     jet_vs_lep1_pt            = ak.pad_none(jet_vs_lep1.pt, max_len)
-    jet_vs_lep1_pt            = ak.fill_none(jet_vs_lep1_pt, -1)
+    jet_vs_lep1_pt            = ak.fill_none(jet_vs_lep1_pt, -999)
     final_mask                = (jet_vs_lep0_pt>30) & (jet_vs_lep1_pt>30)
 
     jet_pt_to_plot            = ak.where(final_mask,jet_vs_lep0_pt,0)
@@ -186,14 +186,15 @@ def jet_pt_def(
     n_jets_vs_lep0 = ak.sum(jet_vs_lep0_pt>0,axis=1)
     n_jets_vs_lep1 = ak.sum(jet_vs_lep1_pt>0,axis=1)
     n_jets_mask = (n_jets_vs_lep0 == n_jets_vs_lep1)
-    n_jets = ak.where(n_jets_mask, n_jets_vs_lep0, 0)
+    n_jets = ak.where(n_jets_mask, n_jets_vs_lep0, -999)
     
     ls_product = leading_jet_pt*subleading_jet_pt
     
-    delta_eta = ak.where(n_jets>=2, delta_eta_0_1, 0)
-    delta_phi =  ak.where(n_jets>=2, delta_phi, 0)
-   
-    mjj = ak.where(n_jets>0,np.sqrt(2*ls_product*(np.cosh(delta_eta) - np.cos(delta_phi))),0) 
+    delta_eta = ak.where(n_jets>=2 , delta_eta_0_1, -100)
+    delta_phi =  ak.where(n_jets>=2, delta_phi    , -999)
+    mjj_mask = (n_jets>0) & (delta_phi != -999) & (delta_eta != -100)
+
+    mjj = ak.where(mjj_mask,np.sqrt(2*ls_product*(np.cosh(delta_eta) - np.cos(delta_phi))),-999) 
     
     return n_jets, leading_jet_pt, subleading_jet_pt, delta_eta, mjj
 
