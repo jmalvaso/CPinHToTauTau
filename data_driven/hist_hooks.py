@@ -89,19 +89,41 @@ def add_hist_hooks(analysis: od.Analysis) -> None:
     def qcd_estimation(task, inputs): #cf0p3
         output = {}
         for config, hists in inputs.items():
-            sr_cats = [c for c in config.categories.names() if '_sr' in c]
+            sr_cats = task.categories
             for the_cat in sr_cats:
-                print(f'producing qcd for {the_cat}')
+                print(f'producing qcd for {the_cat}, {config.name}')
                 sr = config.get_category(the_cat)
                 d = {}
                 mc = {}
                 cr_cat = ''
-                for reg_name, full_name in sr.aux['abcd_regs'].items():   
-                    loc_dict = {'category': hist.loc(full_name),'shift': hist.loc(task.shift)}
+                for reg_name, full_name in sr.aux['abcd_regs'].items():
+                    def up_down_once(sources):
+                        bases = []
+                        for s in sources:
+                            if s.endswith("_up"):
+                                s = s[:-3]
+                            elif s.endswith("_down"):
+                                s = s[:-5]
+                            bases.append(s)
+
+                        out = []
+                        seen = set()
+                        for b in bases:               # preserve order
+                            if b in seen:
+                                continue
+                            seen.add(b)
+                            out.extend((f"{b}_up", f"{b}_down"))
+                        out.extend(("nominal",))
+                        return tuple(out)
+
+                    shift_sources = up_down_once(task.shift_sources)
+                    loc_dict_data = {'category': hist.loc(full_name),'shift': hist.loc("nominal")}
+                    #loc_dict = {'category': hist.loc(full_name),'shift': shift_sources}
+                    loc_dict_mc = {'category': hist.loc(full_name),'shift':hist.loc("nominal")}
                     full_d = get_data_hist(hists)
-                    full_mc = get_mc_hist(hists)   
-                    if full_name in list(full_d.axes[0]): d[reg_name] = get_data_hist(hists)[loc_dict]
-                    if full_name in list(full_mc.axes[0]): mc[reg_name] = get_mc_hist(hists)[loc_dict]
+                    full_mc = get_mc_hist(hists)
+                    if full_name in list(full_d.axes[0]): d[reg_name] = get_data_hist(hists)[loc_dict_data]
+                    if full_name in list(full_mc.axes[0]): mc[reg_name] = get_mc_hist(hists)[loc_dict_mc]
                     if reg_name == 'dr_num': cr_cat = full_name
                         
                 from cmsdb.processes.qcd import qcd
@@ -134,8 +156,8 @@ def add_hist_hooks(analysis: od.Analysis) -> None:
                     val = np.maximum(d['ar'].values() - mc['ar'].values(), 0.) * tf
                     var = (d['ar'].view().variance + mc['ar'].view().variance) * tf**2
                   
-                    tmp_arr[find_idxs(hists[qcd], the_cat, task.shift)].value = val
-                    tmp_arr[find_idxs(hists[qcd], the_cat, task.shift)].variance = var
+                    tmp_arr[find_idxs(hists[qcd], the_cat, "nominal")].value = val
+                    tmp_arr[find_idxs(hists[qcd], the_cat, "nominal")].variance = var
                     if len(cr_cat):
                         if ('dr_den' in d.keys()) and ('dr_den' in mc.keys()):  
                             cr_val = np.maximum(d['dr_den'].values() - mc['dr_den'].values(), 0)
@@ -146,14 +168,14 @@ def add_hist_hooks(analysis: od.Analysis) -> None:
                         else:
                             cr_val = 0
                             cr_var = 0
-                        tmp_arr[find_idxs(hists[qcd], cr_cat, task.shift)].value = cr_val
-                        tmp_arr[find_idxs(hists[qcd], cr_cat, task.shift)].variance = cr_var
+                        tmp_arr[find_idxs(hists[qcd], cr_cat, "nominal")].value = cr_val
+                        tmp_arr[find_idxs(hists[qcd], cr_cat, "nominal")].variance = cr_var
                 else:
                     print("*** WARNING: AR data histogam doesn't exist or empty! ***")
                     
             hists[qcd][...] = tmp_arr
             output[config] = hists
-            return output
+        return output
     
     def ff_method(task, inputs): #cf0p3
         from cmsdb.processes.qcd import jet_fakes,qcd
