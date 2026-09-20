@@ -13,7 +13,7 @@
 #   ./MSSM_submit_stage.sh calibrate 22and23_emu bbphi
 #
 # sample-group:
-#   data | backgrounds | signal | ggphi | bbphi
+#   data | backgrounds | DY | tt | singlet | other_bkgs | signal | ggphi | bbphi
 #
 # stage:
 #   calibrate | select | reduce | merge-reduced |
@@ -23,7 +23,10 @@ set -e
 set -o pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/common_run3_MSSM.sh"
+
+# =============================================================================
+# Arguments
+# =============================================================================
 
 if (( $# < 3 )); then
     echo "Usage: $0 <stage> <config-option> <sample-group> [extra law options]"
@@ -41,6 +44,10 @@ if (( $# < 3 )); then
     echo "Sample groups:"
     echo "  data"
     echo "  backgrounds"
+    echo "  DY"
+    echo "  tt"
+    echo "  singlet"
+    echo "  other_bkgs"
     echo "  signal       (ggphi + bbphi)"
     echo "  ggphi"
     echo "  bbphi"
@@ -52,59 +59,110 @@ config_option="$2"
 sample_group="$3"
 shift 3
 
+# =============================================================================
+# ColumnFlow common setup
+# =============================================================================
+
+source "${SCRIPT_DIR}/common_run3_MSSM.sh"
+
 set_common_vars "$config_option"
+
 
 # =============================================================================
 # Dataset splitting
 # =============================================================================
 
+# Remove a trailing comma from the dataset CSV strings in common_run3_MSSM.sh.
 strip_trailing_comma() {
     local value="$1"
     printf '%s' "${value%,}"
 }
 
-case "$sample_group" in
 
-    data)
-        # Pass the union of all data dataset names.
-        # The ColumnFlow wrapper resolves this list independently for every
-        # config and only keeps datasets that actually exist in that config.
-        datasets_group="$(
-            printf '%s%s%s%s%s%s%s%s' \
-                "$data_egamma_2022preEE" \
-                "$data_mu_2022preEE" \
-                "$data_egamma_2022postEE" \
-                "$data_mu_2022postEE" \
-                "$data_egamma_2023preBPix" \
-                "$data_mu_2023preBPix" \
-                "$data_egamma_2023postBPix" \
-                "$data_mu_2023postBPix"
-        )"
-        datasets_group="$(strip_trailing_comma "$datasets_group")"
-        ;;
+# Data is era dependent, so map every config to its matching data list.
+data_for_config() {
+    local cfg="$1"
 
-    backgrounds|background|bkg)
-        datasets_group="$(strip_trailing_comma "$bkgs")"
-        ;;
+    case "$cfg" in
+        run3_2022_preEE_emu*)
+            strip_trailing_comma "${data_egamma_2022preEE}${data_mu_2022preEE}"
+            ;;
+        run3_2022_postEE_emu*)
+            strip_trailing_comma "${data_egamma_2022postEE}${data_mu_2022postEE}"
+            ;;
+        run3_2023_preBPix_emu*)
+            strip_trailing_comma "${data_egamma_2023preBPix}${data_mu_2023preBPix}"
+            ;;
+        run3_2023_postBPix_emu*)
+            strip_trailing_comma "${data_egamma_2023postBPix}${data_mu_2023postBPix}"
+            ;;
+        *)
+            echo "ERROR: do not know which data datasets correspond to config '$cfg'" >&2
+            return 1
+            ;;
+    esac
+}
 
-    signal)
-        datasets_group="$(strip_trailing_comma "$signal_all")"
-        ;;
 
-    ggphi|ggf)
-        datasets_group="$(strip_trailing_comma "$signal_ggf")"
-        ;;
+# Build the colon-separated dataset specification expected by multi-config wrappers.
+IFS=',' read -r -a config_array <<< "$config"
 
-    bbphi|bbh)
-        datasets_group="$(strip_trailing_comma "$signal_bbh")"
-        ;;
+datasets_group=""
 
-    *)
-        echo "ERROR: unknown sample group '$sample_group'" >&2
-        echo "Allowed: data, backgrounds, signal, ggphi, bbphi" >&2
-        exit 1
-        ;;
-esac
+for cfg in "${config_array[@]}"; do
+
+    case "$sample_group" in
+        data)
+            era_datasets="$(data_for_config "$cfg")"
+            ;;
+
+        backgrounds|background|bkg)
+            era_datasets="$(strip_trailing_comma "$bkgs")"
+            ;;
+
+        DY|dy)
+            era_datasets="$(strip_trailing_comma "$bkg_dy")"
+            ;;
+
+        tt|ttbar)
+            era_datasets="$(strip_trailing_comma "$bkg_ttbar")"
+            ;;
+
+        singlet|single_top|single-top)
+            era_datasets="$(strip_trailing_comma "$bkg_top")"
+            ;;
+
+        other_bkgs|other-bkgs|other)
+            era_datasets="$(strip_trailing_comma "${bkg_wj}${bkg_vv}${bkg_vvv}${bkg_vh_htt}${bkg_higgs}")"
+            ;;
+
+        signal)
+            era_datasets="$(strip_trailing_comma "$signal_all")"
+            ;;
+
+        ggphi|ggf)
+            era_datasets="$(strip_trailing_comma "$signal_ggf")"
+            ;;
+
+        bbphi|bbh)
+            era_datasets="$(strip_trailing_comma "$signal_bbh")"
+            ;;
+
+        *)
+            echo "ERROR: unknown sample group '$sample_group'" >&2
+            echo "Allowed: data, backgrounds, DY, tt, singlet, other_bkgs, signal, ggphi, bbphi" >&2
+            exit 1
+            ;;
+    esac
+
+    if [[ -n "$datasets_group" ]]; then
+        datasets_group="${datasets_group}:"
+    fi
+
+    datasets_group="${datasets_group}${era_datasets}"
+done
+
+
 # =============================================================================
 # Shift definitions
 # =============================================================================
@@ -120,9 +178,8 @@ producer_shifts="${kinematic_shifts},unclustered_*,recoilresp_*,recoilres_*"
 # The wildcard patterns are resolved independently inside each config.
 all_hist_shifts="nominal,muon_weight_*,electron_weight_*,top_pt_weight_*,Trigger_SF_weight_*,zpt_weight_*,pu_weight_*,unclustered_*,jec_*,jer_*,CMS_Scale_muR_*,CMS_Scale_muF_*,CMS_PS_ISR_*,CMS_PS_FSR_*,btag_weight_*,recoilresp_*,recoilres_*"
 
-# Shift sources used by MergeShiftedHistograms. Era-dependent JEC names are
-# deliberately patterns so that 2022 / 2022EE / 2023 / 2023BPix resolve
-# independently for each config.
+
+# Shift sources used by MergeShiftedHistograms.
 shift_sources_list=(
     "muon_weight"
     "electron_weight"
@@ -164,7 +221,9 @@ shift_sources_list=(
     "recoilresp"
     "recoilres"
 )
+
 shift_sources=$(IFS=,; echo "${shift_sources_list[*]}")
+
 
 # Data is processed nominally only.
 if [[ "$sample_group" == "data" ]]; then
@@ -172,6 +231,7 @@ if [[ "$sample_group" == "data" ]]; then
     producer_shifts="nominal"
     all_hist_shifts="nominal"
 fi
+
 
 # =============================================================================
 # Common command fragments
@@ -189,6 +249,7 @@ common_args=(
 # Extra command line options supplied by the user are appended to every stage.
 extra_args=("$@")
 
+
 run_command() {
     echo
     echo "================================================================================"
@@ -198,10 +259,13 @@ run_command() {
     echo "Sample group : $sample_group"
     echo "================================================================================"
     echo
+
     printf 'law run'
     printf ' %s' "$@"
     echo
-    law run "$@"
+    echo
+
+    PYTHONFAULTHANDLER=1 law run "$@"
 }
 
 # =============================================================================
@@ -219,6 +283,7 @@ case "$stage" in
             "${extra_args[@]}"
         ;;
 
+
     select)
         run_command cf.SelectEventsWrapper \
             "${common_args[@]}" \
@@ -228,6 +293,7 @@ case "$stage" in
             --cf.SelectEvents-workflow "$workflow" \
             "${extra_args[@]}"
         ;;
+
 
     reduce)
         run_command cf.ReduceEventsWrapper \
@@ -239,6 +305,7 @@ case "$stage" in
             "${extra_args[@]}"
         ;;
 
+
     merge-reduced)
         run_command cf.MergeReducedEventsWrapper \
             "${common_args[@]}" \
@@ -249,6 +316,7 @@ case "$stage" in
             "${extra_args[@]}"
         ;;
 
+
     produce)
         run_command cf.ProduceColumnsWrapper \
             "${common_args[@]}" \
@@ -257,6 +325,7 @@ case "$stage" in
             --cf.ProduceColumns-workflow "$workflow" \
             "${extra_args[@]}"
         ;;
+
 
     create-hists)
         run_command cf.CreateHistogramsWrapper \
@@ -270,6 +339,7 @@ case "$stage" in
             "${extra_args[@]}"
         ;;
 
+
     merge-hists)
         run_command cf.MergeHistogramsWrapper \
             "${common_args[@]}" \
@@ -281,6 +351,7 @@ case "$stage" in
             --cf.MergeHistograms-workflow "$workflow" \
             "${extra_args[@]}"
         ;;
+
 
     merge-shifted)
         if [[ "$sample_group" == "data" ]]; then
@@ -299,6 +370,7 @@ case "$stage" in
             --cf.MergeShiftedHistograms-workflow "$workflow" \
             "${extra_args[@]}"
         ;;
+
 
     *)
         echo "ERROR: unknown stage '$stage'" >&2

@@ -1105,8 +1105,8 @@ def add_run3(ana: od.Analysis,
     # json file paths
     ################################################################################################       
      
-    jsonpog_dir = "/eos/user/a/anigamov/htt_corrections_mirror/jsonpog-integration_latest/POG/"
-    jsonpog_tau_dir = "/eos/user/a/anigamov/htt_corrections_mirror/jsonpog-integration_tau_latest/POG"
+    # jsonpog_dir = "/eos/user/a/anigamov/htt_corrections_mirror/jsonpog-integration_latest/POG/"
+    # jsonpog_tau_dir = "/eos/user/a/anigamov/htt_corrections_mirror/jsonpog-integration_tau_latest/POG"
     corr_dir = "/eos/user/a/anigamov/htt_corrections_mirror/"
     #CMS Analysis Corrections Documentation: https://cms-analysis-corrections.docs.cern.ch/
     json_acd_path="/cvmfs/cms-griddata.cern.ch/cat/metadata/" 

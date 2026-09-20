@@ -3,7 +3,7 @@
 
 set_common_vars() {
 
-version="all_mass_bdt_test_task_scheduling"
+version="all_mass_bdt_compact_v1"
 
 
 # =============================================================================
