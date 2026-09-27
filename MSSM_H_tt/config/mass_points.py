@@ -334,10 +334,8 @@ def expand_bdt_histogram_variables(
         # -------------------------------------------------------------
 
         else:
-
-            block = get_bdt_mass_block(
-                requested_mass
-            )
+            block = (requested_mass,)
+            #block = get_bdt_mass_block(requested_mass)
 
         # -------------------------------------------------------------
         # For every active mass, request all four final BDT histogram

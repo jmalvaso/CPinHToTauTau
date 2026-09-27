@@ -111,6 +111,11 @@ def main(
         results += json_filter_results
 
     # trigger selection
+    print(
+    "TrigObj in events:", "TrigObj" in ak.fields(events),
+    "fields:", ak.fields(events.TrigObj) if "TrigObj" in ak.fields(events) else [],
+    flush=True,)
+    from IPython import embed; embed()
     events, trigger_results = self[trigger_selection](events, **kwargs)
     results += trigger_results
 

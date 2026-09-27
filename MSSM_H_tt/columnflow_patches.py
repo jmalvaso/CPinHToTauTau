@@ -23,7 +23,7 @@ logger = law.logger.get_logger(__name__)
 #
 # The final branch can contain fewer than 10 files.
 EVENT_FILE_MERGING = 10
-
+DATA_EVENT_FILE_MERGING = 1
 
 @memoize
 def patch_bundle_repo_exclude_files():
@@ -63,35 +63,28 @@ def patch_bundle_repo_exclude_files():
 
 @memoize
 def patch_event_file_merging():
-    """
-    Process up to EVENT_FILE_MERGING original NanoAOD files in each
-    CalibrateEvents, SelectEvents and ReduceEvents branch.
-
-    This changes the branch structure from one branch per NanoAOD file
-    to one branch per group of EVENT_FILE_MERGING NanoAOD files.
-    """
+    """Use one input file for data and ten for MC, including signal."""
 
     from columnflow.tasks.calibration import CalibrateEvents
     from columnflow.tasks.selection import SelectEvents
     from columnflow.tasks.reduction import ReduceEvents
 
-    task_classes = (
-        CalibrateEvents,
-        SelectEvents,
-        ReduceEvents,
-    )
+    def file_merging(task):
+        return (
+            DATA_EVENT_FILE_MERGING
+            if task.dataset_inst.is_data
+            else EVENT_FILE_MERGING
+        )
 
-    for task_cls in task_classes:
-        task_cls.file_merging = EVENT_FILE_MERGING
+    for task_cls in (CalibrateEvents, SelectEvents, ReduceEvents):
+        task_cls.file_merging = property(file_merging)
 
     logger.info(
-        "patched event-level file merging: "
-        f"CalibrateEvents={EVENT_FILE_MERGING}, "
-        f"SelectEvents={EVENT_FILE_MERGING}, "
-        f"ReduceEvents={EVENT_FILE_MERGING}"
+        "patched event-level file merging for CalibrateEvents, "
+        "SelectEvents and ReduceEvents: "
+        f"data={DATA_EVENT_FILE_MERGING}, MC/signal={EVENT_FILE_MERGING}"
     )
-
-
+    
 @memoize
 def patch_all():
     patch_bundle_repo_exclude_files()
