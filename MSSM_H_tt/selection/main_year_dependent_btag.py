@@ -29,7 +29,8 @@ from MSSM_H_tt.selection.lepton_veto import second_lepton_veto, bugged_DY_sample
 from MSSM_H_tt.selection.higgscand import new_higgscand, mask_nans
 from MSSM_H_tt.selection.met_nanoAOD_filters import met_nanoAOD_filters
 from MSSM_H_tt.selection.jets import jet_veto_map
-from MSSM_H_tt.production.btag import btag_weight
+from MSSM_H_tt.production.btag import btag_weight as btag_weight_shape
+from MSSM_H_tt.production.btag_SF_UParT import btag_weight_SF as btag_weight_fixed_wp
 from MSSM_H_tt.production.aux_columns import jets_taggable, channel_id, create_jetID_masks
 from MSSM_H_tt.selection.met_cov_check import met_cov_check
 np = maybe_import("numpy")
@@ -59,7 +60,6 @@ coffea = maybe_import("coffea")
         new_higgscand,
         mask_nans,
         jet_veto_map,
-        btag_weight,
         jets_taggable,
         met_nanoAOD_filters,
         bugged_DY_sample_event_veto,
@@ -83,7 +83,6 @@ coffea = maybe_import("coffea")
         new_higgscand,
         mask_nans,
         jet_veto_map,
-        btag_weight,
         jets_taggable,
         met_nanoAOD_filters,
         "category_ids",
@@ -111,11 +110,6 @@ def main(
         results += json_filter_results
 
     # trigger selection
-    print(
-    "TrigObj in events:", "TrigObj" in ak.fields(events),
-    "fields:", ak.fields(events.TrigObj) if "TrigObj" in ak.fields(events) else [],
-    flush=True,)
-
     events, trigger_results = self[trigger_selection](events, **kwargs)
     results += trigger_results
 
@@ -209,13 +203,18 @@ def main(
     
     results.event = event_sel
 
-    events = self[jets_taggable](events, **kwargs) 
-    # add the mc weight
+    events = self[jets_taggable](events, **kwargs)
+
+    # Add MC and b-tagging weights.
+    #
+    # The actual b-tag producer is selected in main_init:
+    #   * 2022/2023: shape-based SFs
+    #   * 2024:      UParTAK4B fixed-WP SFs (Method 1a)
     if self.dataset_inst.is_mc:
         events = self[mc_weight](events, **kwargs)
-        events = self[btag_weight](events, do_syst=True, **kwargs)
-        events_b_weight = self[mc_weight](events, **kwargs)
-        w_event_btag = events.btag_weight_nom
+        events = self[self.btag_weight_producer](events, do_syst=True, **kwargs)
+        w_event_btag = events[self.btag_nominal_column]
+
     events = self[process_ids](events, **kwargs)
     events = set_ak_column(events, 'category_ids', ak.ones_like(events.event, dtype=np.uint8))
     
@@ -256,3 +255,44 @@ def main(
     events, results = self[increment_stats](
         events, results, stats, weight_map=weight_map, group_map=group_map, **kwargs)
     return events, results
+
+@main.init
+def main_init(self: Selector) -> None:
+    """
+    Register the b-tag SF producer appropriate for the data-taking year.
+
+    2022/2023:
+        Shape-based SF implementation from MSSM_H_tt.production.btag.
+        The nominal event-weight column is ``btag_weight_nom``.
+
+    2024:
+        Fixed-working-point UParTAK4B implementation using BTV Method 1a.
+        The nominal event-weight column is ``btag_weight``.
+
+    Registering the dependency dynamically is important: the 2024 producer
+    loads UParTAK4 fixed-WP corrections and efficiency maps that should not be
+    initialized for the 2022/2023 configurations.
+    """
+
+    # No b-tag SF producer is needed for data.
+    if self.dataset_inst.is_data:
+        return
+
+    year = int(self.config_inst.x.year)
+
+    if year in (2022, 2023):
+        self.btag_weight_producer = btag_weight_shape
+        self.btag_nominal_column = "btag_weight_nom"
+
+    elif year == 2024:
+        self.btag_weight_producer = btag_weight_fixed_wp
+        self.btag_nominal_column = "btag_weight"
+
+    else:
+        raise NotImplementedError(
+            f"No b-tagging SF implementation configured for year {year}"
+        )
+
+    # Dynamically register only the producer required for this configuration.
+    self.uses.add(self.btag_weight_producer)
+    self.produces.add(self.btag_weight_producer)

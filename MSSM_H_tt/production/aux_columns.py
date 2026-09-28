@@ -215,7 +215,7 @@ def create_jetID_masks(
     """
     nano_version = self.config_inst.campaign.x.version
     jets = events.Jet
-    if nano_version in [13, 14]:
+    if nano_version in [13, 14, 15]:
         print(f'Applying custom tightJetID for nanoAOD v{nano_version}...')
         tightID_eta_2p6 = ((jets.neHEF < 0.99)
                            & (jets.neEmEF < 0.9)
@@ -640,7 +640,7 @@ def jet_btag_flags(
     nano_version = self.config_inst.campaign.x.version
     jets = events.Jet
     
-    if nano_version in [13, 14]:
+    if nano_version in [13, 14, 15]:
 
         tightID_eta_2p6 = (
             (jets.neHEF < 0.99)
