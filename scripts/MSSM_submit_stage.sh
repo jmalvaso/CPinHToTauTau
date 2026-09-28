@@ -25,6 +25,20 @@
 #   # Same distributions with nominal/up/down systematic variations:
 #   ./MSSM_submit_stage.sh plot1d-shifted 22and23_emu datacard bdt_D_DY_M100
 #
+# Parallelism:
+#
+#   By default, all relevant remote ColumnFlow workflows are limited to
+#   10 simultaneously active jobs.
+#
+#   Override globally for this invocation with:
+#
+#     ./MSSM_submit_stage.sh select 22and23_emu backgrounds --parallel-jobs 30
+#
+#   This script translates the generic --parallel-jobs option into the
+#   task-family-specific ColumnFlow options, for example:
+#
+#     --cf.SelectEvents-parallel-jobs 30
+#
 # sample-group:
 #   data | backgrounds | DY | tt | singlet | other_bkgs |
 #   signal | ggphi | bbphi | datacard
@@ -80,6 +94,7 @@ shift 3
 # For the datacard plotting mode, the first argument after the sample group is
 # the exact final variable used by one inference-model variant.
 datacard_variable=""
+
 if [[ "$sample_group" == "datacard" ]]; then
     case "$stage" in
         plot1d|plot1d-shifted)
@@ -89,9 +104,11 @@ if [[ "$sample_group" == "datacard" ]]; then
                 echo "  $0 plot1d 22and23_emu datacard bdt_D_DY_M100" >&2
                 exit 1
             fi
+
             datacard_variable="$1"
             shift
             ;;
+
         *)
             echo "ERROR: sample group 'datacard' is only valid for plot1d and plot1d-shifted." >&2
             exit 1
@@ -99,21 +116,77 @@ if [[ "$sample_group" == "datacard" ]]; then
     esac
 fi
 
-# Extra command line options supplied by the user are appended to the selected stage.
-extra_args=("$@")
+# =============================================================================
+# Parallel job handling
+# =============================================================================
+
+# Default maximum number of simultaneously active remote jobs.
+parallel_jobs=10
+
+# Keep all user-supplied LAW options, except the generic --parallel-jobs option.
+#
+# The generic option does not reliably propagate through ColumnFlow wrapper
+# tasks. Therefore, intercept it here and later translate it into
+# --cf.<TaskFamily>-parallel-jobs.
+raw_extra_args=("$@")
+extra_args=()
+
+i=0
+
+while (( i < ${#raw_extra_args[@]} )); do
+    arg="${raw_extra_args[$i]}"
+
+    case "$arg" in
+        --parallel-jobs)
+
+            if (( i + 1 >= ${#raw_extra_args[@]} )); then
+                echo "ERROR: --parallel-jobs requires an integer argument." >&2
+                exit 1
+            fi
+
+            parallel_jobs="${raw_extra_args[$((i + 1))]}"
+
+            if ! [[ "$parallel_jobs" =~ ^[0-9]+$ ]]; then
+                echo "ERROR: invalid value for --parallel-jobs: '$parallel_jobs'" >&2
+                exit 1
+            fi
+
+            ((i += 2))
+            ;;
+
+        --parallel-jobs=*)
+
+            parallel_jobs="${arg#--parallel-jobs=}"
+
+            if ! [[ "$parallel_jobs" =~ ^[0-9]+$ ]]; then
+                echo "ERROR: invalid value for --parallel-jobs: '$parallel_jobs'" >&2
+                exit 1
+            fi
+
+            ((i += 1))
+            ;;
+
+        *)
+
+            extra_args+=("$arg")
+            ((i += 1))
+            ;;
+    esac
+done
 
 # =============================================================================
 # ColumnFlow common setup
 # =============================================================================
 
 source "${SCRIPT_DIR}/common_run3_MSSM.sh"
+
 set_common_vars "$config_option"
 
 # =============================================================================
 # Helpers
 # =============================================================================
 
-# Remove a trailing comma from the dataset/process CSV strings in common_run3_MSSM.sh.
+# Remove a trailing comma from dataset/process CSV strings.
 strip_trailing_comma() {
     local value="$1"
     printf '%s' "${value%,}"
@@ -127,15 +200,19 @@ data_for_config() {
         run3_2022_preEE_emu*)
             strip_trailing_comma "${data_egamma_2022preEE}${data_mu_2022preEE}"
             ;;
+
         run3_2022_postEE_emu*)
             strip_trailing_comma "${data_egamma_2022postEE}${data_mu_2022postEE}"
             ;;
+
         run3_2023_preBPix_emu*)
             strip_trailing_comma "${data_egamma_2023preBPix}${data_mu_2023preBPix}"
             ;;
+
         run3_2023_postBPix_emu*)
             strip_trailing_comma "${data_egamma_2023postBPix}${data_mu_2023postBPix}"
             ;;
+
         *)
             echo "ERROR: do not know which data datasets correspond to config '$cfg'" >&2
             return 1
@@ -143,7 +220,16 @@ data_for_config() {
     esac
 }
 
-# Check whether an option was supplied explicitly in extra_args.
+# Check whether an option was explicitly supplied in extra_args.
+#
+# Supports both:
+#
+#   --option value
+#
+# and:
+#
+#   --option=value
+#
 has_extra_option() {
     local option="$1"
     local arg
@@ -161,16 +247,64 @@ has_extra_option() {
 # Datacard plotting specification
 # =============================================================================
 
-# These are set only for sample_group=datacard.
 datacard_discriminant=""
 datacard_mass=""
 datacard_category=""
 datacard_producers=""
 datacard_signal_datasets=""
 datacard_signal_processes=""
-plot_processes="${processes:-}"
+
+# Process list corresponding exactly to the selected sample group.
+case "$sample_group" in
+
+    data)
+        plot_processes="data"
+        ;;
+
+    backgrounds|background|bkg)
+        plot_processes="dy_lep,dy_tt_m50,h_ggf_htt_sm_prod_sm,st,tt,h_vbf_htt_sm,vh_htt,wj,vv,vvv"
+        ;;
+
+    DY|dy)
+        plot_processes="dy_lep,dy_tt_m50"
+        ;;
+
+    tt|ttbar)
+        plot_processes="tt"
+        ;;
+
+    singlet|single_top|single-top)
+        plot_processes="st"
+        ;;
+
+    other_bkgs|other-bkgs|other)
+        plot_processes="h_ggf_htt_sm_prod_sm,h_vbf_htt_sm,vh_htt,wj,vv,vvv"
+        ;;
+
+    signal)
+        plot_processes="$(strip_trailing_comma "$signal_all")"
+        ;;
+
+    ggphi|ggf)
+        plot_processes="$(strip_trailing_comma "$signal_ggf")"
+        ;;
+
+    bbphi|bbh)
+        plot_processes="$(strip_trailing_comma "$signal_bbh")"
+        ;;
+
+    datacard)
+        # Filled below by the dedicated datacard logic.
+        plot_processes=""
+        ;;
+
+    *)
+        plot_processes="${processes:-}"
+        ;;
+esac
 
 if [[ "$sample_group" == "datacard" ]]; then
+
     if [[ "$datacard_variable" =~ ^bdt_(D_sig_vs_Disc_ggphi|D_sig_vs_Disc_bbphi|D_DY|D_TT)_M([0-9]+)$ ]]; then
         datacard_discriminant="${BASH_REMATCH[1]}"
         datacard_mass="${BASH_REMATCH[2]}"
@@ -186,6 +320,7 @@ if [[ "$sample_group" == "datacard" ]]; then
 
     # Determine the channel from the first config name.
     IFS=',' read -r -a config_array_tmp <<< "$config"
+
     first_cfg="${config_array_tmp[0]}"
 
     if [[ "$first_cfg" =~ _(emu|mutau|etau|tautau)($|_) ]]; then
@@ -197,14 +332,15 @@ if [[ "$sample_group" == "datacard" ]]; then
 
     # Match the canonical category definitions in MSSM_model.init_categories().
     case "$datacard_discriminant" in
+
         D_sig_vs_Disc_ggphi)
-            datacard_category="cat_${datacard_channel}_sr__bdt_signal_M${datacard_mass}"
+            datacard_category="cat_${datacard_channel}_sr__bdt_ggphi_and_bbphi_M${datacard_mass}"
             datacard_signal_datasets="ggphi_phitt_${datacard_mass}"
             datacard_signal_processes="ggphi_phitt_${datacard_mass}"
             ;;
 
         D_sig_vs_Disc_bbphi)
-            datacard_category="cat_${datacard_channel}_sr__bdt_signal_M${datacard_mass}"
+            datacard_category="cat_${datacard_channel}_sr__bdt_ggphi_and_bbphi_M${datacard_mass}"
             datacard_signal_datasets="bbphi_phitt_${datacard_mass}"
             datacard_signal_processes="bbphi_phitt_${datacard_mass}"
             ;;
@@ -220,25 +356,27 @@ if [[ "$sample_group" == "datacard" ]]; then
             datacard_signal_datasets="ggphi_phitt_${datacard_mass},bbphi_phitt_${datacard_mass}"
             datacard_signal_processes="ggphi_phitt_${datacard_mass},bbphi_phitt_${datacard_mass}"
             ;;
+
     esac
 
     # Use the exact producer pair selected by the inference model:
+    #
     #   main_common + bdt_card_<mass-block>
-    # The helper keeps this correct if BDT_MASS_BLOCK_SIZE changes.
+    #
     datacard_bdt_producer="$(
         python - "$datacard_mass" <<'PY'
 import sys
+
 from MSSM_H_tt.config.mass_points import get_bdt_card_producer_name
+
 print(get_bdt_card_producer_name(int(sys.argv[1])))
 PY
     )"
 
     datacard_producers="main_common,${datacard_bdt_producer}"
 
-    # Exactly mirror the signal content of each derived inference-model variant.
-    # processes_bkg already contains data + all standard backgrounds in the current
-    # common_run3_MSSM.sh. Keep a fallback for older versions of that helper file.
     datacard_background_processes="${processes_bkg:-data,dy_lep,dy_tt_m50,h_ggf_htt_sm_prod_sm,st,tt,h_vbf_htt_sm,vh_htt,wj,vv,vvv}"
+
     plot_processes="${datacard_background_processes},${datacard_signal_processes}"
 fi
 
@@ -246,13 +384,14 @@ fi
 # Dataset splitting
 # =============================================================================
 
-# Build the colon-separated dataset specification expected by multi-config tasks.
 IFS=',' read -r -a config_array <<< "$config"
 
 datasets_group=""
 
 for cfg in "${config_array[@]}"; do
+
     case "$sample_group" in
+
         data)
             era_datasets="$(data_for_config "$cfg")"
             ;;
@@ -290,11 +429,9 @@ for cfg in "${config_array[@]}"; do
             ;;
 
         datacard)
-            # Full input needed for the final datacard distribution:
-            # matching data + all backgrounds + only the signal(s) allowed by
-            # the selected inference-model variant and mass.
             era_data="$(data_for_config "$cfg")"
             era_bkgs="$(strip_trailing_comma "$bkgs")"
+
             era_datasets="${era_data},${era_bkgs},${datacard_signal_datasets}"
             ;;
 
@@ -303,6 +440,7 @@ for cfg in "${config_array[@]}"; do
             echo "Allowed: data, backgrounds, DY, tt, singlet, other_bkgs, signal, ggphi, bbphi, datacard" >&2
             exit 1
             ;;
+
     esac
 
     if [[ -n "$datasets_group" ]]; then
@@ -316,14 +454,11 @@ done
 # Shift definitions
 # =============================================================================
 
-# JEC/JER are the only shifts that require distinct calibrated / selected /
-# reduced event streams.
+# JEC/JER require distinct calibrated / selected / reduced event streams.
 kinematic_shifts="nominal,jec_*,jer_*"
 
 # These shifts require separate ProduceColumns / CreateHistograms /
-# MergeHistograms tasks. Weight-only systematics are embedded into the
-# nominal histogram by httcp_hist_producer and must not be scheduled as
-# separate histogram tasks.
+# MergeHistograms tasks.
 hist_shifts="${kinematic_shifts},unclustered_*,recoilresp_*,recoilres_*"
 
 # Shift sources used by MergeShiftedHistograms / PlotShiftedVariables1D.
@@ -334,6 +469,7 @@ shift_sources_list=(
     "Trigger_SF_weight"
     "zpt_weight"
     "pu_weight"
+
     "unclustered"
 
     "jec_Regrouped_Absolute"
@@ -353,15 +489,19 @@ shift_sources_list=(
 
     "CMS_Scale_muR"
     "CMS_Scale_muF"
+
     "CMS_PS_ISR"
     "CMS_PS_FSR"
 
     "btag_weight_hf"
     "btag_weight_lf"
+
     "btag_weight_hfstats1"
     "btag_weight_hfstats2"
+
     "btag_weight_lfstats1"
     "btag_weight_lfstats2"
+
     "btag_weight_cferr1"
     "btag_weight_cferr2"
 
@@ -378,6 +518,42 @@ if [[ "$sample_group" == "data" ]]; then
 fi
 
 # =============================================================================
+# Task-family-specific parallel job settings
+# =============================================================================
+
+# ColumnFlow's AnalysisTask.req_params() explicitly prefers these task-family
+# parameters when propagating remote-workflow settings.
+#
+# Therefore, do not rely on:
+#
+#   --parallel-jobs 10
+#
+# alone.
+#
+# The options below control the actual remote workflow tasks.
+
+parallel_args=()
+
+add_parallel_arg() {
+    local option="$1"
+
+    # Allow an explicitly supplied task-family-specific option to override
+    # the global default / generic --parallel-jobs value.
+    if ! has_extra_option "$option"; then
+        parallel_args+=("$option" "$parallel_jobs")
+    fi
+}
+
+add_parallel_arg "--cf.CalibrateEvents-parallel-jobs"
+add_parallel_arg "--cf.SelectEvents-parallel-jobs"
+add_parallel_arg "--cf.ReduceEvents-parallel-jobs"
+add_parallel_arg "--cf.MergeReducedEvents-parallel-jobs"
+add_parallel_arg "--cf.ProduceColumns-parallel-jobs"
+add_parallel_arg "--cf.CreateHistograms-parallel-jobs"
+add_parallel_arg "--cf.MergeHistograms-parallel-jobs"
+add_parallel_arg "--cf.MergeShiftedHistograms-parallel-jobs"
+
+# =============================================================================
 # Common command fragments
 # =============================================================================
 
@@ -385,20 +561,20 @@ common_args=(
     --version "$version"
     --configs "$config"
     --datasets "$datasets_group"
-    --poll-interval "5m"
     --pilot "True"
-    --parallel-jobs 10
+
+    "${parallel_args[@]}"
 )
 
 # PlotVariables1D and PlotShiftedVariables1D are not wrapper tasks, so keep a
-# dedicated argument list and explicitly point their upstream requirements to
-# the workflow used by the production chain.
+# dedicated argument list and explicitly configure their upstream workflows.
 prepare_plot_args() {
+
     plot_args=(
         --version "$version"
         --configs "$config"
         --datasets "$datasets_group"
-        --poll-interval "1m"
+
         --pilot "True"
 
         --calibrators main
@@ -411,64 +587,93 @@ prepare_plot_args() {
         --cf.ProduceColumns-workflow "$workflow"
         --cf.CreateHistograms-workflow "$workflow"
         --cf.MergeHistograms-workflow "$workflow"
+
+        "${parallel_args[@]}"
     )
 
-    # Process selection.
+    # -------------------------------------------------------------------------
+    # Process selection
+    # -------------------------------------------------------------------------
+
     if ! has_extra_option "--processes"; then
         plot_args+=(--processes "$plot_processes")
     fi
 
-    # Variable/category/producer selection.
+    # -------------------------------------------------------------------------
+    # Variable/category/producer selection
+    # -------------------------------------------------------------------------
+
     if [[ "$sample_group" == "datacard" ]]; then
+
         if ! has_extra_option "--variables"; then
             plot_args+=(--variables "$datacard_variable")
         fi
+
         if ! has_extra_option "--categories"; then
             plot_args+=(--categories "$datacard_category")
         fi
+
         if ! has_extra_option "--producers"; then
             plot_args+=(--producers "$datacard_producers")
         fi
 
-        # The inference model has add_qcd=True. Reproduce the same data-driven
-        # QCD contribution in the diagnostic plot unless explicitly overridden.
+        # The inference model has add_qcd=True.
         if ! has_extra_option "--hist-hooks"; then
             plot_args+=(--hist-hooks qcd)
         fi
+
     else
+
         if ! has_extra_option "--variables"; then
             plot_args+=(--variables "$variables")
         fi
+
         if [[ -n "${categories:-}" ]] && ! has_extra_option "--categories"; then
             plot_args+=(--categories "$categories")
         fi
+
         if ! has_extra_option "--producers"; then
             plot_args+=(--producers main)
         fi
+
     fi
+
+    # -------------------------------------------------------------------------
+    # Output format
+    # -------------------------------------------------------------------------
 
     if ! has_extra_option "--file-types"; then
         plot_args+=(--file-types png)
     fi
+
+    # -------------------------------------------------------------------------
+    # Plot settings
+    # -------------------------------------------------------------------------
 
     if ! has_extra_option "--general-settings"; then
         plot_args+=(--general-settings "cms-label=pw")
     fi
 }
 
+# =============================================================================
+# Command execution helper
+# =============================================================================
+
 run_command() {
+
     echo
     echo "================================================================================"
-    echo "Stage        : $stage"
-    echo "Config option: $config_option"
-    echo "Configs      : $config"
-    echo "Sample group : $sample_group"
+    echo "Stage          : $stage"
+    echo "Config option  : $config_option"
+    echo "Configs        : $config"
+    echo "Sample group   : $sample_group"
+    echo "Parallel jobs  : $parallel_jobs"
 
     if [[ "$sample_group" == "datacard" ]]; then
-        echo "Variable     : $datacard_variable"
-        echo "Category     : $datacard_category"
-        echo "Mass         : $datacard_mass"
-        echo "Producers    : $datacard_producers"
+        echo "Variable       : $datacard_variable"
+        echo "Category       : $datacard_category"
+        echo "Mass           : $datacard_mass"
+        echo "Producers      : $datacard_producers"
     fi
 
     echo "================================================================================"
@@ -487,7 +692,13 @@ run_command() {
 # =============================================================================
 
 case "$stage" in
+
+    # -------------------------------------------------------------------------
+    # Calibration
+    # -------------------------------------------------------------------------
+
     calibrate)
+
         run_command cf.CalibrateEventsWrapper \
             "${common_args[@]}" \
             --calibrator main \
@@ -496,7 +707,12 @@ case "$stage" in
             "${extra_args[@]}"
         ;;
 
+    # -------------------------------------------------------------------------
+    # Selection
+    # -------------------------------------------------------------------------
+
     select)
+
         run_command cf.SelectEventsWrapper \
             "${common_args[@]}" \
             --calibrators main \
@@ -506,7 +722,12 @@ case "$stage" in
             "${extra_args[@]}"
         ;;
 
+    # -------------------------------------------------------------------------
+    # ReduceEvents
+    # -------------------------------------------------------------------------
+
     reduce)
+
         run_command cf.ReduceEventsWrapper \
             "${common_args[@]}" \
             --calibrators main \
@@ -516,7 +737,12 @@ case "$stage" in
             "${extra_args[@]}"
         ;;
 
+    # -------------------------------------------------------------------------
+    # MergeReducedEvents
+    # -------------------------------------------------------------------------
+
     merge-reduced)
+
         run_command cf.MergeReducedEventsWrapper \
             "${common_args[@]}" \
             --calibrators main \
@@ -526,7 +752,12 @@ case "$stage" in
             "${extra_args[@]}"
         ;;
 
+    # -------------------------------------------------------------------------
+    # ProduceColumns
+    # -------------------------------------------------------------------------
+
     produce)
+
         run_command cf.ProduceColumnsWrapper \
             "${common_args[@]}" \
             --producers main \
@@ -535,29 +766,67 @@ case "$stage" in
             "${extra_args[@]}"
         ;;
 
+    # -------------------------------------------------------------------------
+    # CreateHistograms
+    # -------------------------------------------------------------------------
+
     create-hists)
+        create_hists_args=(
+            "${common_args[@]}"
+
+            --calibrators main
+            --selector main
+
+            --shifts "$hist_shifts"
+
+            --cf.CreateHistograms-workflow "$workflow"
+        )
+
+        if ! has_extra_option "--producers"; then
+            create_hists_args+=(--producers main)
+        fi
+
+        if ! has_extra_option "--variables"; then
+            create_hists_args+=(--variables "$variables")
+        fi
+
         run_command cf.CreateHistogramsWrapper \
-            "${common_args[@]}" \
-            --calibrators main \
-            --selector main \
-            --producers main \
-            --variables "$variables" \
-            --shifts "$hist_shifts" \
-            --cf.CreateHistograms-workflow "$workflow" \
+            "${create_hists_args[@]}" \
             "${extra_args[@]}"
         ;;
 
+    # -------------------------------------------------------------------------
+    # MergeHistograms
+    # -------------------------------------------------------------------------
+
     merge-hists)
+        merge_hists_args=(
+            "${common_args[@]}"
+
+            --calibrators main
+            --selector main
+
+            --shifts "$hist_shifts"
+
+            --cf.MergeHistograms-workflow "$workflow"
+        )
+
+        if ! has_extra_option "--producers"; then
+            merge_hists_args+=(--producers main)
+        fi
+
+        if ! has_extra_option "--variables"; then
+            merge_hists_args+=(--variables "$variables")
+        fi
+
         run_command cf.MergeHistogramsWrapper \
-            "${common_args[@]}" \
-            --calibrators main \
-            --selector main \
-            --producers main \
-            --variables "$variables" \
-            --shifts "$hist_shifts" \
-            --cf.MergeHistograms-workflow "$workflow" \
+            "${merge_hists_args[@]}" \
             "${extra_args[@]}"
         ;;
+
+    # -------------------------------------------------------------------------
+    # MergeShiftedHistograms
+    # -------------------------------------------------------------------------
 
     merge-shifted)
         if [[ "$sample_group" == "data" ]]; then
@@ -566,21 +835,36 @@ case "$stage" in
             exit 0
         fi
 
+        merge_shifted_args=(
+            "${common_args[@]}"
+            --calibrators main
+            --selector main
+            --cf.MergeShiftedHistograms-workflow "$workflow"
+        )
+
+        if ! has_extra_option "--producers"; then
+            merge_shifted_args+=(--producers main)
+        fi
+
+        if ! has_extra_option "--variables"; then
+            merge_shifted_args+=(--variables "$variables")
+        fi
+
+        if ! has_extra_option "--shift-sources"; then
+            merge_shifted_args+=(--shift-sources "$shift_sources")
+        fi
+
         run_command cf.MergeShiftedHistogramsWrapper \
-            "${common_args[@]}" \
-            --calibrators main \
-            --selector main \
-            --producers main \
-            --variables "$variables" \
-            --shift-sources "$shift_sources" \
-            --cf.MergeShiftedHistograms-workflow "$workflow" \
+            "${merge_shifted_args[@]}" \
             "${extra_args[@]}"
         ;;
 
     # -------------------------------------------------------------------------
     # Nominal 1D distributions
     # -------------------------------------------------------------------------
+
     plot1d)
+
         prepare_plot_args
 
         run_command cf.PlotVariables1D \
@@ -590,9 +874,11 @@ case "$stage" in
         ;;
 
     # -------------------------------------------------------------------------
-    # Nominal + up/down variations for every requested shift source
+    # Nominal + up/down variations
     # -------------------------------------------------------------------------
+
     plot1d-shifted)
+
         prepare_plot_args
 
         plot_args+=(
@@ -608,12 +894,20 @@ case "$stage" in
             "${extra_args[@]}"
         ;;
 
+    # -------------------------------------------------------------------------
+    # Unknown stage
+    # -------------------------------------------------------------------------
+
     *)
+
         echo "ERROR: unknown stage '$stage'" >&2
+
         echo "Allowed stages:" >&2
         echo "  calibrate, select, reduce, merge-reduced, produce," >&2
         echo "  create-hists, merge-hists, merge-shifted," >&2
         echo "  plot1d, plot1d-shifted" >&2
+
         exit 1
         ;;
+
 esac
