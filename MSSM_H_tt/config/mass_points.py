@@ -234,26 +234,113 @@ def expand_bdt_histogram_variables(
     dataset=None,
 ) -> tuple[str, ...]:
     """
-    Expand BDT datacard histogram variables.
+    Preserve requested BDT histogram variables exactly as requested.
 
-    For backgrounds and data:
-        requesting one BDT datacard variable expands to the complete
-        configured BDT mass block.
+    Rules
+    -----
+    Background and data datasets:
+        Keep the requested variable unchanged.
 
-    For MSSM signals:
-        requesting any BDT datacard variable expands only to the four
-        datacard variables corresponding to the mass of the signal
-        dataset.
+    Signal datasets:
+        Keep the requested variable unchanged, but require the mass encoded
+        in the variable to match the mass encoded in the signal dataset.
 
-    Ordinary variables are left unchanged.
+    Examples
+    --------
+
+    Background:
+
+        dataset:
+            DYto2L_M_50_amcatnloFXFX
+
+        requested:
+            bdt_D_sig_vs_Disc_ggphi_M100
+
+        result:
+            bdt_D_sig_vs_Disc_ggphi_M100
+
+
+    Matching signal:
+
+        dataset:
+            ggphi_phitt_100
+
+        requested:
+            bdt_D_sig_vs_Disc_ggphi_M100
+
+        result:
+            bdt_D_sig_vs_Disc_ggphi_M100
+
+
+    Mismatching signal:
+
+        dataset:
+            ggphi_phitt_500
+
+        requested:
+            bdt_D_sig_vs_Disc_ggphi_M100
+
+        result:
+            ValueError
+
+    The histogram-variable expander must never silently change the requested
+    mass or add unrelated BDT discriminants.
     """
 
     expanded = []
     seen = set()
 
-    def add(
-        variable,
-    ):
+    # Signal mass, or None for backgrounds/data/no dataset.
+    signal_mass = get_mssm_signal_mass(
+        dataset
+    )
+
+    # Useful for error messages.
+    if dataset is None:
+        dataset_name = None
+    elif hasattr(dataset, "name"):
+        dataset_name = dataset.name
+    else:
+        dataset_name = str(dataset)
+
+    for variable in variables:
+
+        variable = str(variable)
+
+        match = _BDT_CARD_HIST_VARIABLE_RE.match(
+            variable
+        )
+
+        # -------------------------------------------------------------
+        # BDT datacard variable
+        # -------------------------------------------------------------
+        if match:
+
+            requested_mass = int(
+                match.group(2)
+            )
+
+            # For MSSM signal datasets, explicitly require the signal mass
+            # and requested BDT mass to agree.
+            if (
+                signal_mass is not None
+                and signal_mass != requested_mass
+            ):
+                raise ValueError(
+                    "Inconsistent MSSM signal dataset and BDT histogram "
+                    "variable:\n"
+                    f"  dataset        : {dataset_name}\n"
+                    f"  signal mass    : {signal_mass}\n"
+                    f"  variable       : {variable}\n"
+                    f"  requested mass : {requested_mass}\n"
+                    "\n"
+                    "The histogram variable mass must match the signal "
+                    "dataset mass."
+                )
+
+        # -------------------------------------------------------------
+        # Preserve variable exactly as requested.
+        # -------------------------------------------------------------
         if variable not in seen:
             expanded.append(
                 variable
@@ -261,98 +348,6 @@ def expand_bdt_histogram_variables(
             seen.add(
                 variable
             )
-
-    # Determine whether this is an MSSM signal dataset.
-    signal_mass = get_mssm_signal_mass(
-        dataset
-    )
-
-    for variable in variables:
-
-        match = _BDT_CARD_HIST_VARIABLE_RE.match(
-            variable
-        )
-
-        # -------------------------------------------------------------
-        # Ordinary variable
-        #
-        # Examples:
-        #   emu_mt_tot
-        #   emu_mvis
-        #   D_zeta
-        #
-        # Nothing special to do.
-        # -------------------------------------------------------------
-
-        if not match:
-            add(
-                variable
-            )
-            continue
-
-        requested_mass = int(
-            match.group(2)
-        )
-
-        # -------------------------------------------------------------
-        # MSSM signal
-        #
-        # Ignore the mass encoded in the seed histogram variable and
-        # use the mass corresponding to the signal dataset itself.
-        #
-        # Example:
-        #
-        #   dataset:
-        #       ggphi_phitt_500
-        #
-        #   requested:
-        #       bdt_D_DY_M60
-        #
-        #   resulting mass block:
-        #       (500,)
-        #
-        # This allows MergeShiftedHistogramsWrapper to use the same
-        # symbolic seed variable for every signal dataset.
-        # -------------------------------------------------------------
-
-        if signal_mass is not None:
-
-            block = (
-                signal_mass,
-            )
-
-        # -------------------------------------------------------------
-        # Background or data
-        #
-        # Preserve the existing mass-block behavior.
-        #
-        # With BDT_MASS_BLOCK_SIZE = 0:
-        #
-        #   bdt_D_DY_M60
-        #
-        # expands to all configured masses.
-        # -------------------------------------------------------------
-
-        else:
-            block = (requested_mass,)
-            #block = get_bdt_mass_block(requested_mass)
-
-        # -------------------------------------------------------------
-        # For every active mass, request all four final BDT histogram
-        # variables.
-        # -------------------------------------------------------------
-
-        for block_mass in block:
-
-            for discriminant in (
-                BDT_CARD_HIST_VARIABLES
-            ):
-
-                add(
-                    f"bdt_"
-                    f"{discriminant}"
-                    f"_M{block_mass}"
-                )
 
     return tuple(
         expanded

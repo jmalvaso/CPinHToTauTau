@@ -61,9 +61,12 @@ Mass = Union[int, str]
 #   export MSSM_BDT_2D_BINNING_BASE=/path/to/bdt/output/base
 BDT_2D_BINNING_BASE = Path(
     os.environ.get(
-        "MSSM_BDT_2D_BINNING_BASE",
-        "/eos/project/d/desytau/public/jmalvaso/"
-        "bdt_3_classes_10_features_clippedJetCounts",
+        "MSSM_BDT_BINNING_BASE",
+        os.environ.get(
+            "MSSM_BDT_2D_BINNING_BASE",
+            "/eos/project/d/desytau/public/jmalvaso/"
+            "bdt_3_classes_10_features_clippedJetCounts",
+        ),
     )
 )
 
