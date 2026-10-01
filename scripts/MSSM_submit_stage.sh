@@ -1500,27 +1500,21 @@ fi
 # =============================================================================
 
 common_args=(
-
-    --version
-    "$version"
-
-    --configs
-    "$config"
-
-    --datasets
-    "$datasets_group"
-
+    --version "$version"
+    --configs "$config"
     --pilot True
     # Always consume MergeReducedEvents downstream instead of falling
     # back to individual ReduceEvents outputs when the second-stage
     # merging factor happens to be 1.
     --cf.ProvideReducedEvents-force-merging True
     "${workflow_args[@]}"
-
     "${parallel_args[@]}"
-
 )
-
+# Allow callers such as MSSM_submit_bdt_campaign.sh to explicitly restrict
+# the dataset list. This is required for signal mass-block filtering.
+if ! has_extra_option "--datasets"; then
+    common_args+=(--datasets "$datasets_group")
+fi
 
 # =============================================================================
 # Plot argument builder

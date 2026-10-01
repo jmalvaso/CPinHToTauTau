@@ -139,7 +139,6 @@ def add_run3(ana: od.Analysis,
     process_names = [
         "data", 
         "data_mu",
-        "data_tau",
         "data_e",
         "data_egamma",
         "data_muoneg",
@@ -514,7 +513,6 @@ def add_run3(ana: od.Analysis,
     cfg.x.process_groups = {
         "data" : [
             "data_mu", 
-            "data_tau",
             "data_e",
             "data_egamma",
             "data_muoneg",
